@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Initial Assessment Combined Grade Calculator</title>
+
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+    }
+
+    .invoice-box {
+      background: white;
+      padding: 35px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      width: 420px;
+    }
+
+    h1 {
+      margin-bottom: 25px;
+      font-size: 28px;
+      color: #222;
+    }
+
+    label {
+      display: block;
+      margin: 15px 0 8px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      text-align: left;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px;
+      font-size: 18px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    textarea {
+      height: 220px;
+      resize: vertical;
+      background: #fafafa;
+      line-height: 1.5;
+    }
+
+    button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    .copied-message {
+      margin-top: 10px;
+      font-size: 16px;
+      color: green;
+      font-weight: bold;
+      min-height: 20px;
+    }
+
+    #breakdownSection {
+      display: none;
+      margin-top: 10px;
+    }
+
+    #summaryBox {
+      margin-top: 20px;
+      padding: 15px;
+      background: #fafafa;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      text-align: left;
+      font-size: 18px;
+      white-space: pre-line;
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="invoice-box">
+    <h1>Initial Assessment Combined Grade Calculator</h1>
+
+    <label for="noncalc">Non‑Calculator Marks (52 max)</label>
+    <input type="number" id="noncalc" placeholder="Enter marks" min="0" max="52">
+
+    <label for="calc">Calculator Marks (61 max)</label>
+    <input type="number" id="calc" placeholder="Enter marks" min="0" max="61">
+
+    <div id="summaryBox"></div>
+    <button id="copySummary">Copy Summary</button>
+    <div class="copied-message" id="copiedMessageSummary"></div>
+
+    <label for="toggle">Show Breakdown</label>
+    <select id="toggle">
+      <option value="hide">Hide</option>
+      <option value="show">Show</option>
+    </select>
+
+    <div id="breakdownSection">
+      <label for="breakdown">Full Breakdown</label>
+      <textarea id="breakdown" readonly></textarea>
+      <button id="copyBreakdown">Copy Breakdown</button>
+      <div class="copied-message" id="copiedMessageBreakdown"></div>
+    </div>
+  </div>
+
+  <script>
+    const noncalcInput = document.getElementById("noncalc");
+    const calcInput = document.getElementById("calc");
+    const breakdownBox = document.getElementById("breakdown");
+    const summaryBox = document.getElementById("summaryBox");
+
+    const toggle = document.getElementById("toggle");
+    const breakdownSection = document.getElementById("breakdownSection");
+
+    const copyBreakdown = document.getElementById("copyBreakdown");
+    const copiedMessageBreakdown = document.getElementById("copiedMessageBreakdown");
+
+    const copySummary = document.getElementById("copySummary");
+    const copiedMessageSummary = document.getElementById("copiedMessageSummary");
+
+    const boundaries = [
+      { grade: "5", minPct: 69, maxPct: 100 },
+      { grade: "4", minPct: 54, maxPct: 68 },
+      { grade: "3", minPct: 38, maxPct: 53 },
+      { grade: "2", minPct: 23, maxPct: 37 },
+      { grade: "1", minPct: 10, maxPct: 22 },
+      { grade: "U", minPct: 0,  maxPct: 9 }
+    ];
+
+    toggle.addEventListener("change", () => {
+      breakdownSection.style.display = toggle.value === "show" ? "block" : "none";
+    });
+
+    function determineGrade(total) {
+      const pct = (total / 113) * 100;
+
+      for (let b of boundaries) {
+        if (pct >= b.minPct && pct <= b.maxPct) {
+          const minMark = Math.ceil((b.minPct / 100) * 113);
+          const maxMark = Math.floor((b.maxPct / 100) * 113);
+
+          const span = maxMark - minMark + 1;
+          const chunk = span / 3;
+
+          let level = "";
+          if (total < minMark + chunk) level = "LOW";
+          else if (total < minMark + 2 * chunk) level = "MEDIUM";
+          else level = "HIGH";
+
+          return {
+            grade: b.grade,
+            level: level,
+            minMark: minMark,
+            maxMark: maxMark,
+            pct: pct
+          };
+        }
+      }
+    }
+
+    function updateGrade() {
+      const noncalc = Number(noncalcInput.value);
+      const calc = Number(calcInput.value);
+
+      if (
+        noncalcInput.value === "" ||
+        calcInput.value === "" ||
+        noncalc < 0 || noncalc > 52 ||
+        calc < 0 || calc > 61
+      ) {
+        breakdownBox.value = "";
+        summaryBox.textContent = "";
+        return;
+      }
+
+      const total = noncalc + calc;
+      const result = determineGrade(total);
+
+      breakdownBox.value =
+`GCSE MATHS GRADE CALCULATION
+
+Non‑calculator: ${noncalc} / 52
+Calculator: ${calc} / 61
+Total: ${total} / 113
+Percentage: ${result.pct.toFixed(1)}%
+
+Assigned Grade: ${result.grade} (${result.level})
+
+Grade Band Range (out of 113):
+${result.minMark} – ${result.maxMark}
+
+Notes:
+- Grade boundaries applied using % of 113.
+- LOW / MEDIUM / HIGH split equally inside each band.`;
+
+      summaryBox.textContent =
+`Assigned Grade: ${result.grade} (${result.level})
+Total Marks: ${total} / 113
+Percentage: ${result.pct.toFixed(1)}%`;
+    }
+
+    noncalcInput.addEventListener("input", updateGrade);
+    calcInput.addEventListener("input", updateGrade);
+
+    copyBreakdown.addEventListener("click", () => {
+      if (breakdownBox.value.trim() === "") {
+        copiedMessageBreakdown.textContent = "Nothing to copy.";
+        return;
+      }
+      breakdownBox.select();
+      navigator.clipboard.writeText(breakdownBox.value);
+      copiedMessageBreakdown.textContent = "Copied!";
+    });
+
+    copySummary.addEventListener("click", () => {
+      if (summaryBox.textContent.trim() === "") {
+        copiedMessageSummary.textContent = "Nothing to copy.";
+        return;
+      }
+      navigator.clipboard.writeText(summaryBox.textContent);
+      copiedMessageSummary.textContent = "Copied!";
+    });
+
+    // Disable right-click
+    document.addEventListener("contextmenu", event => event.preventDefault());
+
+    // Disable view-source shortcuts
+    document.addEventListener("keydown", function(e) {
+      if (
+        e.key === "F12" ||
+        (e.ctrlKey && e.key.toLowerCase() === "u") ||
+        (e.ctrlKey && e.shiftKey && ["i","j","c"].includes(e.key.toLowerCase()))
+      ) {
+        e.preventDefault();
+      }
+    });
+  </script>
+
+</body>
+</html>
