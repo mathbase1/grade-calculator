@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -76,6 +76,24 @@
       background: #0056b3;
     }
 
+    button:disabled {
+      background: #66788a;
+      cursor: not-allowed;
+    }
+
+    input[aria-invalid="true"] {
+      border-color: #b42318;
+    }
+
+    .validation-message {
+      color: #b42318;
+      font-size: 16px;
+      line-height: 1.5;
+      text-align: left;
+      margin: 12px 0 0;
+      white-space: pre-line;
+    }
+
     .copied-message {
       margin-top: 10px;
       font-size: 16px;
@@ -99,26 +117,36 @@
       font-size: 18px;
       white-space: pre-line;
     }
+
+    @media (max-width: 520px) {
+      .invoice-box {
+        width: calc(100% - 24px);
+        padding: 24px;
+        box-sizing: border-box;
+      }
+    }
   </style>
 </head>
 
 <body>
-
   <div class="invoice-box">
     <h1>Initial Assessment Combined Grade Calculator</h1>
 
-    <label for="noncalc">Non‑Calculator Marks (52 max)</label>
-    <input type="number" id="noncalc" placeholder="Enter marks" min="0" max="52">
+    <label for="noncalc" id="noncalcLabel">Non-Calculator Marks</label>
+    <input type="number" id="noncalc" placeholder="Enter marks"
+           min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
 
-    <label for="calc">Calculator Marks (61 max)</label>
-    <input type="number" id="calc" placeholder="Enter marks" min="0" max="61">
+    <label for="calc" id="calcLabel">Calculator Marks</label>
+    <input type="number" id="calc" placeholder="Enter marks"
+           min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
 
-    <div id="summaryBox"></div>
-    <button id="copySummary">Copy Summary</button>
-    <div class="copied-message" id="copiedMessageSummary"></div>
+    <p id="validationMessage" class="validation-message" role="alert" hidden></p>
+    <div id="summaryBox" role="status" aria-live="polite" aria-atomic="true"></div>
+    <button type="button" id="copySummary" disabled>Copy Summary</button>
+    <div class="copied-message" id="copiedMessageSummary" role="status"></div>
 
     <label for="toggle">Show Breakdown</label>
-    <select id="toggle">
+    <select id="toggle" aria-controls="breakdownSection">
       <option value="hide">Hide</option>
       <option value="show">Show</option>
     </select>
@@ -126,143 +154,265 @@
     <div id="breakdownSection">
       <label for="breakdown">Full Breakdown</label>
       <textarea id="breakdown" readonly></textarea>
-      <button id="copyBreakdown">Copy Breakdown</button>
-      <div class="copied-message" id="copiedMessageBreakdown"></div>
+      <button type="button" id="copyBreakdown" disabled>Copy Breakdown</button>
+      <div class="copied-message" id="copiedMessageBreakdown" role="status"></div>
     </div>
+    <noscript><p>Enable JavaScript to use this calculator.</p></noscript>
   </div>
 
   <script>
+    "use strict";
+
+    // The two paper maxima supplied for this assessment.
+    // Change them here only: labels, validation, totals and bands update together.
+    const MAX_MARKS = Object.freeze({ noncalc: 52, calc: 61 });
+    const TOTAL_MAX = MAX_MARKS.noncalc + MAX_MARKS.calc;
+
+    // Minimum percentage thresholds, in ascending order.
+    // Each grade continues up to (but not including) the next threshold.
+    // Do not add inclusive percentage maxima: those caused the original gaps.
+    const boundaries = [
+      { grade: "U", minPct: 0 },
+      { grade: "1", minPct: 10 },
+      { grade: "2", minPct: 23 },
+      { grade: "3", minPct: 38 },
+      { grade: "4", minPct: 54 },
+      { grade: "5", minPct: 69 }
+    ];
+    const LEVELS = ["LOW", "MEDIUM", "HIGH"];
+
+    // A grade starts at the first whole mark that reaches its threshold.
+    // It ends exactly one mark below the next grade's first mark.
+    const gradeBands = boundaries.map((boundary, index) => {
+      const nextBoundary = boundaries[index + 1];
+      return {
+        grade: boundary.grade,
+        minPct: boundary.minPct,
+        minMark: Math.ceil(boundary.minPct * TOTAL_MAX / 100),
+        maxMark: nextBoundary
+          ? Math.ceil(nextBoundary.minPct * TOTAL_MAX / 100) - 1
+          : TOTAL_MAX
+      };
+    });
+
     const noncalcInput = document.getElementById("noncalc");
     const calcInput = document.getElementById("calc");
     const breakdownBox = document.getElementById("breakdown");
     const summaryBox = document.getElementById("summaryBox");
-
+    const validationMessage = document.getElementById("validationMessage");
     const toggle = document.getElementById("toggle");
     const breakdownSection = document.getElementById("breakdownSection");
-
     const copyBreakdown = document.getElementById("copyBreakdown");
     const copiedMessageBreakdown = document.getElementById("copiedMessageBreakdown");
-
     const copySummary = document.getElementById("copySummary");
     const copiedMessageSummary = document.getElementById("copiedMessageSummary");
+    let calculationVersion = 0;
 
-    const boundaries = [
-      { grade: "5", minPct: 69, maxPct: 100 },
-      { grade: "4", minPct: 54, maxPct: 68 },
-      { grade: "3", minPct: 38, maxPct: 53 },
-      { grade: "2", minPct: 23, maxPct: 37 },
-      { grade: "1", minPct: 10, maxPct: 22 },
-      { grade: "U", minPct: 0,  maxPct: 9 }
-    ];
+    noncalcInput.max = String(MAX_MARKS.noncalc);
+    calcInput.max = String(MAX_MARKS.calc);
+    document.getElementById("noncalcLabel").textContent =
+      `Non-Calculator Marks (${MAX_MARKS.noncalc} max)`;
+    document.getElementById("calcLabel").textContent =
+      `Calculator Marks (${MAX_MARKS.calc} max)`;
 
     toggle.addEventListener("change", () => {
       breakdownSection.style.display = toggle.value === "show" ? "block" : "none";
     });
 
     function determineGrade(total) {
-      const pct = (total / 113) * 100;
-
-      for (let b of boundaries) {
-        if (pct >= b.minPct && pct <= b.maxPct) {
-          const minMark = Math.ceil((b.minPct / 100) * 113);
-          const maxMark = Math.floor((b.maxPct / 100) * 113);
-
-          const span = maxMark - minMark + 1;
-          const chunk = span / 3;
-
-          let level = "";
-          if (total < minMark + chunk) level = "LOW";
-          else if (total < minMark + 2 * chunk) level = "MEDIUM";
-          else level = "HIGH";
-
-          return {
-            grade: b.grade,
-            level: level,
-            minMark: minMark,
-            maxMark: maxMark,
-            pct: pct
-          };
-        }
+      if (!Number.isInteger(total) || total < 0 || total > TOTAL_MAX) {
+        throw new RangeError(`Total marks must be a whole number from 0 to ${TOTAL_MAX}.`);
       }
+
+      const band = gradeBands.find(b => total >= b.minMark && total <= b.maxMark);
+      if (!band) {
+        throw new Error("The grade boundary configuration does not cover this total.");
+      }
+
+      // Keep the original whole-mark thirds approach, now using complete bands.
+      // Integer comparisons avoid rounding at LOW/MEDIUM/HIGH boundaries.
+      const span = band.maxMark - band.minMark + 1;
+      const offsetTimesThree = (total - band.minMark) * 3;
+      const levelIndex = offsetTimesThree < span ? 0 : offsetTimesThree < 2 * span ? 1 : 2;
+      const levelRanges = LEVELS.map((level, index) => ({
+        level,
+        minMark: band.minMark + Math.ceil(index * span / 3),
+        maxMark: band.minMark + Math.ceil((index + 1) * span / 3) - 1
+      }));
+
+      return {
+        grade: band.grade,
+        level: LEVELS[levelIndex],
+        minMark: band.minMark,
+        maxMark: band.maxMark,
+        pct: total * 100 / TOTAL_MAX,
+        levelRanges
+      };
+    }
+
+    function readMarks(input, maximum, paperName) {
+      // A number input can have bad input even when its .value appears empty.
+      if (input.validity.badInput) {
+        return { error: `${paperName}: enter a whole number from 0 to ${maximum}.` };
+      }
+      if (input.value.trim() === "") {
+        return { empty: true };
+      }
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0 || value > maximum) {
+        return { error: `${paperName}: enter a whole number from 0 to ${maximum}.` };
+      }
+      return { value };
     }
 
     function updateGrade() {
-      const noncalc = Number(noncalcInput.value);
-      const calc = Number(calcInput.value);
+      calculationVersion += 1;
 
-      if (
-        noncalcInput.value === "" ||
-        calcInput.value === "" ||
-        noncalc < 0 || noncalc > 52 ||
-        calc < 0 || calc > 61
-      ) {
-        breakdownBox.value = "";
-        summaryBox.textContent = "";
+      // Clear the previous result first, so invalid or incomplete input can
+      // never leave an old total or an old grade on screen or ready to copy.
+      breakdownBox.value = "";
+      summaryBox.textContent = "";
+      copySummary.disabled = true;
+      copyBreakdown.disabled = true;
+      copiedMessageSummary.textContent = "";
+      copiedMessageBreakdown.textContent = "";
+      validationMessage.textContent = "";
+      validationMessage.hidden = true;
+
+      const noncalc = readMarks(noncalcInput, MAX_MARKS.noncalc, "Non-calculator marks");
+      const calc = readMarks(calcInput, MAX_MARKS.calc, "Calculator marks");
+      noncalcInput.setAttribute("aria-invalid", noncalc.error ? "true" : "false");
+      calcInput.setAttribute("aria-invalid", calc.error ? "true" : "false");
+
+      const errors = [noncalc.error, calc.error].filter(Boolean);
+      if (errors.length > 0) {
+        validationMessage.textContent = errors.join("\n");
+        validationMessage.hidden = false;
+        return;
+      }
+      if (noncalc.empty || calc.empty) {
+        if (!(noncalc.empty && calc.empty)) {
+          validationMessage.textContent = "Enter both paper marks to calculate the combined grade.";
+          validationMessage.hidden = false;
+        }
         return;
       }
 
-      const total = noncalc + calc;
+      // Both values are validated numbers, not strings or separate percentages.
+      const total = noncalc.value + calc.value;
       const result = determineGrade(total);
+      // Round only the displayed percentage, never the value used for grading.
+      const percentage = result.pct.toFixed(2);
+      const levelBreakdown = result.levelRanges
+        .map(range => `${range.level}: ${range.minMark} – ${range.maxMark}`)
+        .join("\n");
 
       breakdownBox.value =
 `GCSE MATHS GRADE CALCULATION
 
-Non‑calculator: ${noncalc} / 52
-Calculator: ${calc} / 61
-Total: ${total} / 113
-Percentage: ${result.pct.toFixed(1)}%
+Non-calculator: ${noncalc.value} / ${MAX_MARKS.noncalc}
+Calculator: ${calc.value} / ${MAX_MARKS.calc}
+Total: ${total} / ${TOTAL_MAX}
+Percentage: ${percentage}%
 
 Assigned Grade: ${result.grade} (${result.level})
 
-Grade Band Range (out of 113):
+Grade Band Range (out of ${TOTAL_MAX}):
 ${result.minMark} – ${result.maxMark}
 
+LOW / MEDIUM / HIGH ranges (combined marks):
+${levelBreakdown}
+
 Notes:
-- Grade boundaries applied using % of 113.
-- LOW / MEDIUM / HIGH split equally inside each band.`;
+- Maximum total: ${MAX_MARKS.noncalc} + ${MAX_MARKS.calc} = ${TOTAL_MAX} marks.
+- The supplied minimum percentage boundaries are used without gaps.
+- Each grade ends one mark before the next grade starts.
+- Grading uses unrounded thresholds, not the displayed percentage.
+- LOW / MEDIUM / HIGH divide each whole-mark band into thirds as evenly as possible.
+- Percentages are displayed to 2 decimal places.`;
 
       summaryBox.textContent =
 `Assigned Grade: ${result.grade} (${result.level})
-Total Marks: ${total} / 113
-Percentage: ${result.pct.toFixed(1)}%`;
+Total Marks: ${total} / ${TOTAL_MAX}
+Percentage: ${percentage}%`;
+
+      copySummary.disabled = false;
+      copyBreakdown.disabled = false;
     }
 
     noncalcInput.addEventListener("input", updateGrade);
     calcInput.addEventListener("input", updateGrade);
+    // Also refresh when the browser restores form values from its page cache.
+    window.addEventListener("pageshow", updateGrade);
 
-    copyBreakdown.addEventListener("click", () => {
-      if (breakdownBox.value.trim() === "") {
-        copiedMessageBreakdown.textContent = "Nothing to copy.";
+    async function writeClipboard(text) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (_) {
+          // Try the legacy fallback when Clipboard API permission is unavailable.
+        }
+      }
+
+      const previousFocus = document.activeElement;
+      const temporary = document.createElement("textarea");
+      temporary.value = text;
+      temporary.readOnly = true;
+      temporary.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;font-size:16px;";
+      document.body.appendChild(temporary);
+      try {
+        temporary.focus();
+        temporary.select();
+        temporary.setSelectionRange(0, temporary.value.length);
+        return document.execCommand("copy") === true;
+      } catch (_) {
+        return false;
+      } finally {
+        temporary.remove();
+        if (previousFocus && previousFocus.isConnected && typeof previousFocus.focus === "function") {
+          previousFocus.focus({ preventScroll: true });
+        }
+      }
+    }
+
+    async function copyOutput(text, messageElement) {
+      if (text.trim() === "") {
+        messageElement.textContent = "Nothing to copy.";
         return;
       }
-      breakdownBox.select();
-      navigator.clipboard.writeText(breakdownBox.value);
-      copiedMessageBreakdown.textContent = "Copied!";
+      const version = calculationVersion;
+      const success = await writeClipboard(text);
+      // Do not show an outdated confirmation after the marks have changed.
+      if (version !== calculationVersion) return;
+      messageElement.textContent = success
+        ? "Copied!"
+        : "Copy failed. Please select the text and copy it manually.";
+    }
+
+    copyBreakdown.addEventListener("click", () => {
+      copyOutput(breakdownBox.value, copiedMessageBreakdown);
     });
 
     copySummary.addEventListener("click", () => {
-      if (summaryBox.textContent.trim() === "") {
-        copiedMessageSummary.textContent = "Nothing to copy.";
-        return;
-      }
-      navigator.clipboard.writeText(summaryBox.textContent);
-      copiedMessageSummary.textContent = "Copied!";
+      copyOutput(summaryBox.textContent, copiedMessageSummary);
     });
 
-    // Disable right-click
+    // Retain the original right-click and view-source shortcut restrictions.
+    // These are interface restrictions, not protection for client-side source code.
     document.addEventListener("contextmenu", event => event.preventDefault());
-
-    // Disable view-source shortcuts
-    document.addEventListener("keydown", function(e) {
+    document.addEventListener("keydown", event => {
+      const key = event.key.toLowerCase();
       if (
-        e.key === "F12" ||
-        (e.ctrlKey && e.key.toLowerCase() === "u") ||
-        (e.ctrlKey && e.shiftKey && ["i","j","c"].includes(e.key.toLowerCase()))
+        key === "f12" ||
+        (event.ctrlKey && key === "u") ||
+        (event.ctrlKey && event.shiftKey && ["i", "j", "c"].includes(key))
       ) {
-        e.preventDefault();
+        event.preventDefault();
       }
     });
-  </script>
 
+    updateGrade();
+  </script>
 </body>
 </html>
