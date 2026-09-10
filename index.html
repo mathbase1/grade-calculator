@@ -132,13 +132,31 @@
   <div class="invoice-box">
     <h1>Initial Assessment Combined Grade Calculator</h1>
 
-    <label for="noncalc" id="noncalcLabel">Non-Calculator Marks</label>
-    <input type="number" id="noncalc" placeholder="Enter marks"
-           min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
+    <label for="paperCount">Number of papers to mark</label>
+    <select id="paperCount" aria-controls="paperSelection noncalcGroup calcGroup">
+      <option value="1">One paper</option>
+      <option value="2" selected>Two papers (combined)</option>
+    </select>
 
-    <label for="calc" id="calcLabel">Calculator Marks</label>
-    <input type="number" id="calc" placeholder="Enter marks"
-           min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
+    <div id="paperSelection" hidden>
+      <label for="paperChoice">Paper to mark</label>
+      <select id="paperChoice" aria-controls="noncalcGroup calcGroup" disabled>
+        <option value="noncalc" id="noncalcOption">Non-calculator</option>
+        <option value="calc" id="calcOption">Calculator</option>
+      </select>
+    </div>
+
+    <div id="noncalcGroup">
+      <label for="noncalc" id="noncalcLabel">Non-Calculator Marks</label>
+      <input type="number" id="noncalc" placeholder="Enter marks"
+             min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
+    </div>
+
+    <div id="calcGroup">
+      <label for="calc" id="calcLabel">Calculator Marks</label>
+      <input type="number" id="calc" placeholder="Enter marks"
+             min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
+    </div>
 
     <p id="validationMessage" class="validation-message" role="alert" hidden></p>
     <div id="summaryBox" role="status" aria-live="polite" aria-atomic="true"></div>
@@ -164,7 +182,7 @@
     "use strict";
 
     // The two paper maxima supplied for this assessment.
-    // Change them here only: labels, validation, totals and bands update together.
+    // Change them here only: labels, selections, validation, totals and bands update together.
     const MAX_MARKS = Object.freeze({ noncalc: 52, calc: 61 });
     const TOTAL_MAX = MAX_MARKS.noncalc + MAX_MARKS.calc;
 
@@ -183,18 +201,27 @@
 
     // A grade starts at the first whole mark that reaches its threshold.
     // It ends exactly one mark below the next grade's first mark.
-    const gradeBands = boundaries.map((boundary, index) => {
-      const nextBoundary = boundaries[index + 1];
-      return {
-        grade: boundary.grade,
-        minPct: boundary.minPct,
-        minMark: Math.ceil(boundary.minPct * TOTAL_MAX / 100),
-        maxMark: nextBoundary
-          ? Math.ceil(nextBoundary.minPct * TOTAL_MAX / 100) - 1
-          : TOTAL_MAX
-      };
-    });
+    // Rebuild the whole-mark bands for the selected paper maximum, not always 113.
+    function buildGradeBands(maximum) {
+      if (!Number.isSafeInteger(maximum) || maximum <= 0) {
+        throw new RangeError("The maximum mark must be a positive whole number.");
+      }
+      return boundaries.map((boundary, index) => {
+        const nextBoundary = boundaries[index + 1];
+        return {
+          grade: boundary.grade,
+          minPct: boundary.minPct,
+          minMark: Math.ceil(boundary.minPct * maximum / 100),
+          maxMark: nextBoundary
+            ? Math.ceil(nextBoundary.minPct * maximum / 100) - 1
+            : maximum
+        };
+      });
+    }
 
+    const paperCountSelect = document.getElementById("paperCount");
+    const paperChoiceSelect = document.getElementById("paperChoice");
+    const paperSelection = document.getElementById("paperSelection");
     const noncalcInput = document.getElementById("noncalc");
     const calcInput = document.getElementById("calc");
     const breakdownBox = document.getElementById("breakdown");
@@ -208,22 +235,58 @@
     const copiedMessageSummary = document.getElementById("copiedMessageSummary");
     let calculationVersion = 0;
 
+    const papers = [
+      {
+        id: "noncalc", name: "Non-calculator", maximum: MAX_MARKS.noncalc,
+        input: noncalcInput, group: document.getElementById("noncalcGroup")
+      },
+      {
+        id: "calc", name: "Calculator", maximum: MAX_MARKS.calc,
+        input: calcInput, group: document.getElementById("calcGroup")
+      }
+    ];
+
     noncalcInput.max = String(MAX_MARKS.noncalc);
     calcInput.max = String(MAX_MARKS.calc);
     document.getElementById("noncalcLabel").textContent =
       `Non-Calculator Marks (${MAX_MARKS.noncalc} max)`;
     document.getElementById("calcLabel").textContent =
       `Calculator Marks (${MAX_MARKS.calc} max)`;
+    document.getElementById("noncalcOption").textContent =
+      `Non-calculator (${MAX_MARKS.noncalc} max)`;
+    document.getElementById("calcOption").textContent =
+      `Calculator (${MAX_MARKS.calc} max)`;
+
+    function getSelectedPapers() {
+      return paperCountSelect.value === "1"
+        ? papers.filter(paper => paper.id === paperChoiceSelect.value)
+        : papers;
+    }
+
+    function syncPaperSelection() {
+      const singlePaper = paperCountSelect.value === "1";
+      paperSelection.hidden = !singlePaper;
+      paperChoiceSelect.disabled = !singlePaper;
+      const selectedPapers = getSelectedPapers();
+      papers.forEach(paper => {
+        const selected = selectedPapers.includes(paper);
+        paper.group.hidden = !selected;
+        paper.input.disabled = !selected;
+      });
+      // Preserve entered marks for switching back, but never include hidden marks.
+      updateGrade();
+    }
 
     toggle.addEventListener("change", () => {
       breakdownSection.style.display = toggle.value === "show" ? "block" : "none";
     });
 
-    function determineGrade(total) {
-      if (!Number.isInteger(total) || total < 0 || total > TOTAL_MAX) {
-        throw new RangeError(`Total marks must be a whole number from 0 to ${TOTAL_MAX}.`);
+    function determineGrade(total, maximum = TOTAL_MAX) {
+      if (!Number.isInteger(total) || total < 0 || total > maximum) {
+        throw new RangeError(`Total marks must be a whole number from 0 to ${maximum}.`);
       }
 
+      const gradeBands = buildGradeBands(maximum);
       const band = gradeBands.find(b => total >= b.minMark && total <= b.maxMark);
       if (!band) {
         throw new Error("The grade boundary configuration does not cover this total.");
@@ -245,7 +308,7 @@
         level: LEVELS[levelIndex],
         minMark: band.minMark,
         maxMark: band.maxMark,
-        pct: total * 100 / TOTAL_MAX,
+        pct: total * 100 / maximum,
         levelRanges
       };
     }
@@ -279,28 +342,42 @@
       validationMessage.textContent = "";
       validationMessage.hidden = true;
 
-      const noncalc = readMarks(noncalcInput, MAX_MARKS.noncalc, "Non-calculator marks");
-      const calc = readMarks(calcInput, MAX_MARKS.calc, "Calculator marks");
-      noncalcInput.setAttribute("aria-invalid", noncalc.error ? "true" : "false");
-      calcInput.setAttribute("aria-invalid", calc.error ? "true" : "false");
+      papers.forEach(paper => paper.input.setAttribute("aria-invalid", "false"));
+      // Read and validate ONLY the selected papers. An unmarked paper is not zero.
+      const markedPapers = getSelectedPapers().map(paper => {
+        const marks = readMarks(paper.input, paper.maximum, `${paper.name} marks`);
+        paper.input.setAttribute("aria-invalid", marks.error ? "true" : "false");
+        return { ...paper, ...marks };
+      });
 
-      const errors = [noncalc.error, calc.error].filter(Boolean);
+      const errors = markedPapers.map(paper => paper.error).filter(Boolean);
       if (errors.length > 0) {
         validationMessage.textContent = errors.join("\n");
         validationMessage.hidden = false;
         return;
       }
-      if (noncalc.empty || calc.empty) {
-        if (!(noncalc.empty && calc.empty)) {
+      if (markedPapers.some(paper => paper.empty)) {
+        if (!markedPapers.every(paper => paper.empty)) {
           validationMessage.textContent = "Enter both paper marks to calculate the combined grade.";
           validationMessage.hidden = false;
         }
         return;
       }
 
-      // Both values are validated numbers, not strings or separate percentages.
-      const total = noncalc.value + calc.value;
-      const result = determineGrade(total);
+      // Sum raw marks and their matching maxima; do not average paper percentages.
+      const total = markedPapers.reduce((sum, paper) => sum + paper.value, 0);
+      const maximum = markedPapers.reduce((sum, paper) => sum + paper.maximum, 0);
+      const result = determineGrade(total, maximum);
+      const paperContext = markedPapers.length === 1
+        ? `Paper marked: ${markedPapers[0].name}`
+        : "Papers marked: Non-calculator and calculator";
+      const paperMarks = markedPapers
+        .map(paper => `${paper.name}: ${paper.value} / ${paper.maximum}`)
+        .join("\n");
+      const maximumNote = markedPapers.length === 1
+        ? `Maximum total: ${maximum} marks (${markedPapers[0].name.toLowerCase()} only).`
+        : `Maximum total: ${markedPapers.map(paper => paper.maximum).join(" + ")} = ${maximum} marks.`;
+      const rangeLabel = markedPapers.length === 1 ? "selected paper marks" : "combined marks";
       // Round only the displayed percentage, never the value used for grading.
       const percentage = result.pct.toFixed(2);
       const levelBreakdown = result.levelRanges
@@ -310,21 +387,22 @@
       breakdownBox.value =
 `GCSE MATHS GRADE CALCULATION
 
-Non-calculator: ${noncalc.value} / ${MAX_MARKS.noncalc}
-Calculator: ${calc.value} / ${MAX_MARKS.calc}
-Total: ${total} / ${TOTAL_MAX}
+${paperContext}
+${paperMarks}
+Total: ${total} / ${maximum}
 Percentage: ${percentage}%
 
 Assigned Grade: ${result.grade} (${result.level})
 
-Grade Band Range (out of ${TOTAL_MAX}):
+Grade Band Range (out of ${maximum}):
 ${result.minMark} – ${result.maxMark}
 
-LOW / MEDIUM / HIGH ranges (combined marks):
+LOW / MEDIUM / HIGH ranges (${rangeLabel}):
 ${levelBreakdown}
 
 Notes:
-- Maximum total: ${MAX_MARKS.noncalc} + ${MAX_MARKS.calc} = ${TOTAL_MAX} marks.
+- ${maximumNote}
+- Only the selected paper(s) contribute to the total and maximum.
 - The supplied minimum percentage boundaries are used without gaps.
 - Each grade ends one mark before the next grade starts.
 - Grading uses unrounded thresholds, not the displayed percentage.
@@ -333,17 +411,20 @@ Notes:
 
       summaryBox.textContent =
 `Assigned Grade: ${result.grade} (${result.level})
-Total Marks: ${total} / ${TOTAL_MAX}
-Percentage: ${percentage}%`;
+Total Marks: ${total} / ${maximum}
+Percentage: ${percentage}%
+${paperContext}`;
 
       copySummary.disabled = false;
       copyBreakdown.disabled = false;
     }
 
+    paperCountSelect.addEventListener("change", syncPaperSelection);
+    paperChoiceSelect.addEventListener("change", syncPaperSelection);
     noncalcInput.addEventListener("input", updateGrade);
     calcInput.addEventListener("input", updateGrade);
     // Also refresh when the browser restores form values from its page cache.
-    window.addEventListener("pageshow", updateGrade);
+    window.addEventListener("pageshow", syncPaperSelection);
 
     async function writeClipboard(text) {
       if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
@@ -412,7 +493,7 @@ Percentage: ${percentage}%`;
       }
     });
 
-    updateGrade();
+    syncPaperSelection();
   </script>
 </body>
 </html>
