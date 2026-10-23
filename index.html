@@ -1,0 +1,898 @@
+<!DOCTYPE html>
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Assessment Grade Calculator</title>
+
+  <style>
+    body {
+      margin: 0;
+      min-height: 100vh;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      font-family: Arial, sans-serif;
+      background: #f4f4f4;
+    }
+
+    .invoice-box {
+      background: white;
+      padding: 35px;
+      border-radius: 12px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+      text-align: center;
+      width: 420px;
+    }
+
+    h1 {
+      margin-bottom: 25px;
+      font-size: 28px;
+      color: #222;
+    }
+
+    label {
+      display: block;
+      margin: 15px 0 8px;
+      font-size: 18px;
+      font-weight: bold;
+      color: #333;
+      text-align: left;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 12px;
+      font-size: 18px;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      box-sizing: border-box;
+      font-family: Arial, sans-serif;
+    }
+
+    textarea {
+      height: 220px;
+      resize: vertical;
+      background: #fafafa;
+      line-height: 1.5;
+    }
+
+    button {
+      margin-top: 12px;
+      width: 100%;
+      padding: 12px;
+      font-size: 18px;
+      font-weight: bold;
+      border: none;
+      border-radius: 8px;
+      background: #007bff;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #0056b3;
+    }
+
+    button:disabled {
+      background: #66788a;
+      cursor: not-allowed;
+    }
+
+    input[aria-invalid="true"] {
+      border-color: #b42318;
+    }
+
+    .validation-message {
+      color: #b42318;
+      font-size: 16px;
+      line-height: 1.5;
+      text-align: left;
+      margin: 12px 0 0;
+      white-space: pre-line;
+    }
+
+    .copied-message {
+      margin-top: 10px;
+      font-size: 16px;
+      color: green;
+      font-weight: bold;
+      min-height: 20px;
+    }
+
+    #breakdownSection {
+      display: none;
+      margin-top: 10px;
+    }
+
+    #summaryBox {
+      margin-top: 20px;
+      padding: 15px;
+      background: #fafafa;
+      border: 2px solid #ccc;
+      border-radius: 8px;
+      text-align: left;
+      font-size: 18px;
+      white-space: pre-line;
+    }
+
+    @media (max-width: 520px) {
+      .invoice-box {
+        width: calc(100% - 24px);
+        padding: 24px;
+        box-sizing: border-box;
+      }
+    }
+
+    /* Assessment tabs and administrative context. The September controls and
+       calculation rules below are retained from the supplied calculator. */
+    * { box-sizing: border-box; }
+    [hidden] { display: none !important; }
+    body { align-items: flex-start; padding: 28px 16px; color: #222; }
+    .invoice-box { width: 820px; max-width: 100%; padding: 32px; text-align: left; }
+    .admin-badge {
+      display: inline-block; padding: 6px 10px; border-radius: 5px;
+      background: #e8f1ff; color: #194b8c; font-size: 12px;
+      font-weight: bold; letter-spacing: .08em;
+    }
+    h1 { font-size: 29px; line-height: 1.2; margin: 15px 0 10px; }
+    .intro, .selection-help { color: #526071; font-size: 15px; line-height: 1.55; }
+    .intro { margin: 0 0 22px; }
+    .selection-help { margin: 0 0 10px; color: #333; font-weight: bold; }
+    .assessment-tabs {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px; margin: 0 0 26px;
+    }
+    .assessment-tab {
+      margin: 0; min-height: 92px; padding: 14px 12px; text-align: left;
+      border: 2px solid #dce3ec; background: #f6f8fb; color: #34445b;
+      font-size: 16px; line-height: 1.3; border-radius: 8px;
+    }
+    .assessment-tab:hover { background: #edf3fc; border-color: #799dc9; }
+    .assessment-tab[aria-selected="true"] { background: #075cb5; border-color: #075cb5; color: #fff; }
+    .tab-description { display: block; font-size: 12px; font-weight: normal; margin-top: 6px; line-height: 1.4; }
+    button:focus-visible, input:focus-visible, select:focus-visible,
+    textarea:focus-visible, summary:focus-visible, [role="tabpanel"]:focus-visible {
+      outline: 3px solid #0871d8; outline-offset: 3px;
+    }
+    .assessment-panel { border-top: 1px solid #e0e5ec; padding-top: 22px; }
+    .panel-heading { margin: 0 0 8px; font-size: 22px; line-height: 1.3; }
+    .panel-description { margin: 0 0 20px; font-size: 15px; line-height: 1.6; color: #526071; }
+    .input-help { margin: 8px 0 0; font-size: 14px; color: #526071; line-height: 1.5; }
+    label { font-size: 16px; }
+    button { background: #075cb5; font-size: 16px; }
+    button:hover { background: #04488e; }
+    button:disabled { background: #66788a; }
+    #summaryBox, .summary-box {
+      margin-top: 20px; padding: 18px; border: 1px solid #bfd3eb;
+      border-left: 4px solid #075cb5; border-radius: 8px; background: #f3f7fd;
+      text-align: left; font-size: 18px; line-height: 1.65; white-space: pre-line;
+      overflow-wrap: anywhere;
+    }
+    #summaryBox:empty, .summary-box:empty { display: none; }
+    .copied-message { font-size: 14px; margin-top: 8px; }
+    .breakdown-section { margin-top: 10px; }
+    .clear-button { background: #fff; color: #34445b; border: 1px solid #c1cbd7; margin-top: 20px; }
+    .clear-button:hover { background: #f1f4f8; }
+    .boundary-details { margin-top: 24px; border: 1px solid #dce3ec; border-radius: 8px; padding: 14px 16px; }
+    .boundary-details summary { cursor: pointer; font-weight: bold; font-size: 15px; line-height: 1.5; }
+    .boundary-details p { margin: 12px 0; font-size: 14px; line-height: 1.5; color: #526071; }
+    table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.5; }
+    caption { text-align: left; padding: 12px 0; font-weight: bold; }
+    th, td { padding: 8px 12px; border-bottom: 1px solid #e0e5ec; text-align: left; }
+    th { background: #f1f4f8; }
+    tr.is-current td { background: #e8f1ff; font-weight: bold; }
+    tr:last-child td { border-bottom: 0; }
+    .pass-rule { padding: 12px 16px; border-radius: 8px; background: #f1f4f8; color: #34445b; line-height: 1.6; font-size: 15px; }
+    .admin-note { margin: 26px 0 0; padding-top: 18px; border-top: 1px solid #e0e5ec; font-size: 13px; line-height: 1.55; color: #526071; }
+    @media (max-width: 520px) {
+      body { padding: 12px 8px; }
+      .invoice-box { width: 100%; padding: 20px 16px; }
+      h1 { font-size: 26px; }
+      .assessment-tabs { gap: 5px; margin-bottom: 20px; }
+      .assessment-tab { font-size: 13px; padding: 10px 7px; min-height: 106px; }
+      .tab-description { font-size: 11px; }
+      .panel-heading { font-size: 21px; }
+      #summaryBox, .summary-box { font-size: 16px; padding: 14px; }
+      th, td { padding: 8px; }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="invoice-box">
+    <header>
+      <span class="admin-badge">ADMIN USE</span>
+      <h1>Assessment grade calculator</h1>
+      <p class="intro">For teachers and authorised administration staff.<br>Choose the correct assessment, then enter the learner's whole marks.</p>
+    </header>
+
+    <p class="selection-help" id="assessmentHelp">Select assessment</p>
+    <nav class="assessment-tabs" role="tablist" aria-labelledby="assessmentHelp" aria-orientation="horizontal">
+      <button type="button" class="assessment-tab" id="tab-september" role="tab"
+              aria-selected="true" aria-controls="panel-september" tabindex="0" data-assessment="september">
+        September Diagnostic<span class="tab-description">GCSE · One or two papers</span>
+      </button>
+      <button type="button" class="assessment-tab" id="tab-october" role="tab"
+              aria-selected="false" aria-controls="panel-october" tabindex="-1" data-assessment="october">
+        October Half-Term<span class="tab-description">GCSE · Out of 50 marks</span>
+      </button>
+      <button type="button" class="assessment-tab" id="tab-functional" role="tab"
+              aria-selected="false" aria-controls="panel-functional" tabindex="-1" data-assessment="functional">
+        Functional Skills<span class="tab-description">Out of 56 · Pass / Not pass</span>
+      </button>
+    </nav>
+
+    <section class="assessment-panel" id="panel-september" role="tabpanel" aria-labelledby="tab-september" tabindex="0">
+      <h2 class="panel-heading">September diagnostic</h2>
+      <p class="panel-description">The existing diagnostic calculator: non-calculator out of <strong>52</strong>, calculator out of <strong>61</strong>, or both combined out of <strong>113</strong>. The original grade boundaries and LOW / MEDIUM / HIGH calculations are unchanged.</p>
+
+    <label for="paperCount">Number of papers to mark</label>
+    <select id="paperCount" aria-controls="paperSelection noncalcGroup calcGroup">
+      <option value="1">One paper</option>
+      <option value="2" selected>Two papers (combined)</option>
+    </select>
+
+    <div id="paperSelection" hidden>
+      <label for="paperChoice">Paper to mark</label>
+      <select id="paperChoice" aria-controls="noncalcGroup calcGroup" disabled>
+        <option value="noncalc" id="noncalcOption">Non-calculator</option>
+        <option value="calc" id="calcOption">Calculator</option>
+      </select>
+    </div>
+
+    <div id="noncalcGroup">
+      <label for="noncalc" id="noncalcLabel">Non-Calculator Marks</label>
+      <input type="number" id="noncalc" placeholder="Enter marks"
+             min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
+    </div>
+
+    <div id="calcGroup">
+      <label for="calc" id="calcLabel">Calculator Marks</label>
+      <input type="number" id="calc" placeholder="Enter marks"
+             min="0" step="1" inputmode="numeric" aria-describedby="validationMessage">
+    </div>
+
+    <p id="validationMessage" class="validation-message" role="alert" hidden></p>
+    <div id="summaryBox" role="status" aria-live="polite" aria-atomic="true"></div>
+    <button type="button" id="copySummary" disabled>Copy Summary</button>
+    <div class="copied-message" id="copiedMessageSummary" role="status"></div>
+
+    <label for="toggle">Show Breakdown</label>
+    <select id="toggle" aria-controls="breakdownSection">
+      <option value="hide">Hide</option>
+      <option value="show">Show</option>
+    </select>
+
+    <div id="breakdownSection">
+      <label for="breakdown">Full Breakdown</label>
+      <textarea id="breakdown" readonly></textarea>
+      <button type="button" id="copyBreakdown" disabled>Copy Breakdown</button>
+      <div class="copied-message" id="copiedMessageBreakdown" role="status"></div>
+    </div>
+      <button type="button" class="clear-button" id="clearSeptember">Clear September marks</button>
+    </section>
+
+    <section class="assessment-panel" id="panel-october" role="tabpanel" aria-labelledby="tab-october" tabindex="0" hidden>
+      <h2 class="panel-heading">End-of-October half-term assessment</h2>
+      <p class="panel-description">One paper out of <strong>50 marks</strong>. Uses the supplied October mark ranges, including the exact High, Medium and Low bands. A score from 0 to 4 is U.</p>
+      <label for="octoberMarks">October assessment marks (50 max)</label>
+      <input type="number" id="octoberMarks" placeholder="Enter marks out of 50"
+             min="0" max="50" step="1" inputmode="numeric" aria-describedby="octoberHelp octoberValidation">
+      <p class="input-help" id="octoberHelp">Enter a whole number from 0 to 50. The grade updates automatically.</p>
+      <p class="validation-message" id="octoberValidation" role="alert" hidden></p>
+      <div class="summary-box" id="octoberSummary" role="status" aria-live="polite" aria-atomic="true"></div>
+      <button type="button" id="octoberCopySummary" disabled>Copy Summary</button>
+      <div class="copied-message" id="octoberCopiedSummary" role="status"></div>
+
+      <label for="octoberToggle">Show Breakdown</label>
+      <select id="octoberToggle" aria-controls="octoberBreakdownSection">
+        <option value="hide">Hide</option>
+        <option value="show">Show</option>
+      </select>
+      <div class="breakdown-section" id="octoberBreakdownSection" hidden>
+        <label for="octoberBreakdown">Full Breakdown</label>
+        <textarea id="octoberBreakdown" readonly></textarea>
+        <button type="button" id="octoberCopyBreakdown" disabled>Copy Breakdown</button>
+        <div class="copied-message" id="octoberCopiedBreakdown" role="status"></div>
+      </div>
+      <button type="button" class="clear-button" id="clearOctober">Clear October marks</button>
+
+      <details class="boundary-details">
+        <summary>View October grade boundaries</summary>
+        <p>These boundaries apply only to the October paper. The current result is highlighted when valid marks are entered.</p>
+        <table>
+          <caption>October half-term assessment · 50 marks</caption>
+          <thead><tr><th scope="col">Mark</th><th scope="col">Grade</th></tr></thead>
+          <tbody id="octoberBoundaryRows"></tbody>
+        </table>
+      </details>
+    </section>
+
+    <section class="assessment-panel" id="panel-functional" role="tabpanel" aria-labelledby="tab-functional" tabindex="0" hidden>
+      <h2 class="panel-heading">Functional Skills assessment</h2>
+      <p class="panel-description">One paper out of <strong>56 marks</strong>. The result is <strong>Pass</strong> or <strong>Not pass</strong> only.</p>
+      <p class="pass-rule"><strong>Pass mark: 34 out of 56.</strong><br>34–56 marks: Pass. &nbsp; 0–33 marks: Not pass.</p>
+      <label for="functionalMarks">Functional Skills marks (56 max)</label>
+      <input type="number" id="functionalMarks" placeholder="Enter marks out of 56"
+             min="0" max="56" step="1" inputmode="numeric" aria-describedby="functionalHelp functionalValidation">
+      <p class="input-help" id="functionalHelp">Enter a whole number from 0 to 56. The result updates automatically.</p>
+      <p class="validation-message" id="functionalValidation" role="alert" hidden></p>
+      <div class="summary-box" id="functionalSummary" role="status" aria-live="polite" aria-atomic="true"></div>
+      <button type="button" id="functionalCopySummary" disabled>Copy Summary</button>
+      <div class="copied-message" id="functionalCopiedSummary" role="status"></div>
+      <button type="button" class="clear-button" id="clearFunctional">Clear Functional Skills marks</button>
+    </section>
+
+    <p class="admin-note"><strong>Admin reminder:</strong> Check the selected assessment before recording a result. Marks stay separate in each tab. Use the clear button before entering the next learner's marks.</p>
+    <noscript><p>Enable JavaScript to use this calculator.</p></noscript>
+  </main>
+
+  <script>
+    "use strict";
+
+    // The two paper maxima supplied for this assessment.
+    // Change them here only: labels, selections, validation, totals and bands update together.
+    const MAX_MARKS = Object.freeze({ noncalc: 52, calc: 61 });
+    const TOTAL_MAX = MAX_MARKS.noncalc + MAX_MARKS.calc;
+
+    // Minimum percentage thresholds, in ascending order.
+    // Each grade continues up to (but not including) the next threshold.
+    // Do not add inclusive percentage maxima: those caused the original gaps.
+    const boundaries = [
+      { grade: "U", minPct: 0 },
+      { grade: "1", minPct: 10 },
+      { grade: "2", minPct: 23 },
+      { grade: "3", minPct: 38 },
+      { grade: "4", minPct: 54 },
+      { grade: "5", minPct: 69 }
+    ];
+    const LEVELS = ["LOW", "MEDIUM", "HIGH"];
+
+    // A grade starts at the first whole mark that reaches its threshold.
+    // It ends exactly one mark below the next grade's first mark.
+    // Rebuild the whole-mark bands for the selected paper maximum, not always 113.
+    function buildGradeBands(maximum) {
+      if (!Number.isSafeInteger(maximum) || maximum <= 0) {
+        throw new RangeError("The maximum mark must be a positive whole number.");
+      }
+      return boundaries.map((boundary, index) => {
+        const nextBoundary = boundaries[index + 1];
+        return {
+          grade: boundary.grade,
+          minPct: boundary.minPct,
+          minMark: Math.ceil(boundary.minPct * maximum / 100),
+          maxMark: nextBoundary
+            ? Math.ceil(nextBoundary.minPct * maximum / 100) - 1
+            : maximum
+        };
+      });
+    }
+
+    const paperCountSelect = document.getElementById("paperCount");
+    const paperChoiceSelect = document.getElementById("paperChoice");
+    const paperSelection = document.getElementById("paperSelection");
+    const noncalcInput = document.getElementById("noncalc");
+    const calcInput = document.getElementById("calc");
+    const breakdownBox = document.getElementById("breakdown");
+    const summaryBox = document.getElementById("summaryBox");
+    const validationMessage = document.getElementById("validationMessage");
+    const toggle = document.getElementById("toggle");
+    const breakdownSection = document.getElementById("breakdownSection");
+    const copyBreakdown = document.getElementById("copyBreakdown");
+    const copiedMessageBreakdown = document.getElementById("copiedMessageBreakdown");
+    const copySummary = document.getElementById("copySummary");
+    const copiedMessageSummary = document.getElementById("copiedMessageSummary");
+    let calculationVersion = 0;
+
+    const papers = [
+      {
+        id: "noncalc", name: "Non-calculator", maximum: MAX_MARKS.noncalc,
+        input: noncalcInput, group: document.getElementById("noncalcGroup")
+      },
+      {
+        id: "calc", name: "Calculator", maximum: MAX_MARKS.calc,
+        input: calcInput, group: document.getElementById("calcGroup")
+      }
+    ];
+
+    noncalcInput.max = String(MAX_MARKS.noncalc);
+    calcInput.max = String(MAX_MARKS.calc);
+    document.getElementById("noncalcLabel").textContent =
+      `Non-Calculator Marks (${MAX_MARKS.noncalc} max)`;
+    document.getElementById("calcLabel").textContent =
+      `Calculator Marks (${MAX_MARKS.calc} max)`;
+    document.getElementById("noncalcOption").textContent =
+      `Non-calculator (${MAX_MARKS.noncalc} max)`;
+    document.getElementById("calcOption").textContent =
+      `Calculator (${MAX_MARKS.calc} max)`;
+
+    function getSelectedPapers() {
+      return paperCountSelect.value === "1"
+        ? papers.filter(paper => paper.id === paperChoiceSelect.value)
+        : papers;
+    }
+
+    function syncPaperSelection() {
+      const singlePaper = paperCountSelect.value === "1";
+      paperSelection.hidden = !singlePaper;
+      paperChoiceSelect.disabled = !singlePaper;
+      const selectedPapers = getSelectedPapers();
+      papers.forEach(paper => {
+        const selected = selectedPapers.includes(paper);
+        paper.group.hidden = !selected;
+        paper.input.disabled = !selected;
+      });
+      // Preserve entered marks for switching back, but never include hidden marks.
+      updateGrade();
+    }
+
+    toggle.addEventListener("change", () => {
+      breakdownSection.style.display = toggle.value === "show" ? "block" : "none";
+    });
+
+    function determineGrade(total, maximum = TOTAL_MAX) {
+      if (!Number.isInteger(total) || total < 0 || total > maximum) {
+        throw new RangeError(`Total marks must be a whole number from 0 to ${maximum}.`);
+      }
+
+      const gradeBands = buildGradeBands(maximum);
+      const band = gradeBands.find(b => total >= b.minMark && total <= b.maxMark);
+      if (!band) {
+        throw new Error("The grade boundary configuration does not cover this total.");
+      }
+
+      // Keep the original whole-mark thirds approach, now using complete bands.
+      // Integer comparisons avoid rounding at LOW/MEDIUM/HIGH boundaries.
+      const span = band.maxMark - band.minMark + 1;
+      const offsetTimesThree = (total - band.minMark) * 3;
+      const levelIndex = offsetTimesThree < span ? 0 : offsetTimesThree < 2 * span ? 1 : 2;
+      const levelRanges = LEVELS.map((level, index) => ({
+        level,
+        minMark: band.minMark + Math.ceil(index * span / 3),
+        maxMark: band.minMark + Math.ceil((index + 1) * span / 3) - 1
+      }));
+
+      return {
+        grade: band.grade,
+        level: LEVELS[levelIndex],
+        minMark: band.minMark,
+        maxMark: band.maxMark,
+        pct: total * 100 / maximum,
+        levelRanges
+      };
+    }
+
+    function readMarks(input, maximum, paperName) {
+      // A number input can have bad input even when its .value appears empty.
+      if (input.validity.badInput) {
+        return { error: `${paperName}: enter a whole number from 0 to ${maximum}.` };
+      }
+      if (input.value.trim() === "") {
+        return { empty: true };
+      }
+      const value = Number(input.value);
+      if (!Number.isFinite(value) || !Number.isInteger(value) || value < 0 || value > maximum) {
+        return { error: `${paperName}: enter a whole number from 0 to ${maximum}.` };
+      }
+      return { value };
+    }
+
+    function updateGrade() {
+      calculationVersion += 1;
+
+      // Clear the previous result first, so invalid or incomplete input can
+      // never leave an old total or an old grade on screen or ready to copy.
+      breakdownBox.value = "";
+      summaryBox.textContent = "";
+      copySummary.disabled = true;
+      copyBreakdown.disabled = true;
+      copiedMessageSummary.textContent = "";
+      copiedMessageBreakdown.textContent = "";
+      validationMessage.textContent = "";
+      validationMessage.hidden = true;
+
+      papers.forEach(paper => paper.input.setAttribute("aria-invalid", "false"));
+      // Read and validate ONLY the selected papers. An unmarked paper is not zero.
+      const markedPapers = getSelectedPapers().map(paper => {
+        const marks = readMarks(paper.input, paper.maximum, `${paper.name} marks`);
+        paper.input.setAttribute("aria-invalid", marks.error ? "true" : "false");
+        return { ...paper, ...marks };
+      });
+
+      const errors = markedPapers.map(paper => paper.error).filter(Boolean);
+      if (errors.length > 0) {
+        validationMessage.textContent = errors.join("\n");
+        validationMessage.hidden = false;
+        return;
+      }
+      if (markedPapers.some(paper => paper.empty)) {
+        if (!markedPapers.every(paper => paper.empty)) {
+          validationMessage.textContent = "Enter both paper marks to calculate the combined grade.";
+          validationMessage.hidden = false;
+        }
+        return;
+      }
+
+      // Sum raw marks and their matching maxima; do not average paper percentages.
+      const total = markedPapers.reduce((sum, paper) => sum + paper.value, 0);
+      const maximum = markedPapers.reduce((sum, paper) => sum + paper.maximum, 0);
+      const result = determineGrade(total, maximum);
+      const paperContext = markedPapers.length === 1
+        ? `Paper marked: ${markedPapers[0].name}`
+        : "Papers marked: Non-calculator and calculator";
+      const paperMarks = markedPapers
+        .map(paper => `${paper.name}: ${paper.value} / ${paper.maximum}`)
+        .join("\n");
+      const maximumNote = markedPapers.length === 1
+        ? `Maximum total: ${maximum} marks (${markedPapers[0].name.toLowerCase()} only).`
+        : `Maximum total: ${markedPapers.map(paper => paper.maximum).join(" + ")} = ${maximum} marks.`;
+      const rangeLabel = markedPapers.length === 1 ? "selected paper marks" : "combined marks";
+      // Round only the displayed percentage, never the value used for grading.
+      const percentage = result.pct.toFixed(2);
+      const levelBreakdown = result.levelRanges
+        .map(range => `${range.level}: ${range.minMark} – ${range.maxMark}`)
+        .join("\n");
+
+      breakdownBox.value =
+`GCSE MATHS GRADE CALCULATION
+Assessment: September diagnostic
+
+${paperContext}
+${paperMarks}
+Total: ${total} / ${maximum}
+Percentage: ${percentage}%
+
+Assigned Grade: ${result.grade} (${result.level})
+
+Grade Band Range (out of ${maximum}):
+${result.minMark} – ${result.maxMark}
+
+LOW / MEDIUM / HIGH ranges (${rangeLabel}):
+${levelBreakdown}
+
+Notes:
+- ${maximumNote}
+- Only the selected paper(s) contribute to the total and maximum.
+- The supplied minimum percentage boundaries are used without gaps.
+- Each grade ends one mark before the next grade starts.
+- Grading uses unrounded thresholds, not the displayed percentage.
+- LOW / MEDIUM / HIGH divide each whole-mark band into thirds as evenly as possible.
+- Percentages are displayed to 2 decimal places.`;
+
+      summaryBox.textContent =
+`Assessment: September diagnostic
+Assigned Grade: ${result.grade} (${result.level})
+Total Marks: ${total} / ${maximum}
+Percentage: ${percentage}%
+${paperContext}`;
+
+      copySummary.disabled = false;
+      copyBreakdown.disabled = false;
+    }
+
+    paperCountSelect.addEventListener("change", syncPaperSelection);
+    paperChoiceSelect.addEventListener("change", syncPaperSelection);
+    noncalcInput.addEventListener("input", updateGrade);
+    calcInput.addEventListener("input", updateGrade);
+    // Also refresh when the browser restores form values from its page cache.
+    window.addEventListener("pageshow", syncPaperSelection);
+
+    async function writeClipboard(text) {
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+        try {
+          await navigator.clipboard.writeText(text);
+          return true;
+        } catch (_) {
+          // Try the legacy fallback when Clipboard API permission is unavailable.
+        }
+      }
+
+      const previousFocus = document.activeElement;
+      const temporary = document.createElement("textarea");
+      temporary.value = text;
+      temporary.readOnly = true;
+      temporary.style.cssText = "position:fixed;left:-9999px;top:0;opacity:0;font-size:16px;";
+      document.body.appendChild(temporary);
+      try {
+        temporary.focus();
+        temporary.select();
+        temporary.setSelectionRange(0, temporary.value.length);
+        return document.execCommand("copy") === true;
+      } catch (_) {
+        return false;
+      } finally {
+        temporary.remove();
+        if (previousFocus && previousFocus.isConnected && typeof previousFocus.focus === "function") {
+          previousFocus.focus({ preventScroll: true });
+        }
+      }
+    }
+
+    async function copyOutput(text, messageElement) {
+      if (text.trim() === "") {
+        messageElement.textContent = "Nothing to copy.";
+        return;
+      }
+      const version = calculationVersion;
+      const success = await writeClipboard(text);
+      // Do not show an outdated confirmation after the marks have changed.
+      if (version !== calculationVersion) return;
+      messageElement.textContent = success
+        ? "Copied!"
+        : "Copy unavailable. Please select the text and copy it manually.";
+    }
+
+    copyBreakdown.addEventListener("click", () => {
+      copyOutput(breakdownBox.value, copiedMessageBreakdown);
+    });
+
+    copySummary.addEventListener("click", () => {
+      copyOutput(summaryBox.textContent, copiedMessageSummary);
+    });
+
+    // Retain the original right-click and view-source shortcut restrictions.
+    // These are interface restrictions, not protection for client-side source code.
+    document.addEventListener("contextmenu", event => event.preventDefault());
+    document.addEventListener("keydown", event => {
+      const key = event.key.toLowerCase();
+      if (
+        key === "f12" ||
+        (event.ctrlKey && key === "u") ||
+        (event.ctrlKey && event.shiftKey && ["i", "j", "c"].includes(key))
+      ) {
+        event.preventDefault();
+      }
+    });
+
+
+    // OCTOBER: exact inclusive raw-mark ranges transcribed from the supplied table.
+    // Do not reuse September percentages or divide October grade bands into thirds.
+    const OCTOBER_MAX_MARKS = 50;
+    const OCTOBER_BANDS = Object.freeze([
+      { minMark: 0,  maxMark: 4,  grade: "U", level: null },
+      { minMark: 5,  maxMark: 6,  grade: "1", level: "Low" },
+      { minMark: 7,  maxMark: 8,  grade: "1", level: "Medium" },
+      { minMark: 9,  maxMark: 10, grade: "1", level: "High" },
+      { minMark: 11, maxMark: 12, grade: "2", level: "Low" },
+      { minMark: 13, maxMark: 14, grade: "2", level: "Medium" },
+      { minMark: 15, maxMark: 16, grade: "2", level: "High" },
+      { minMark: 17, maxMark: 18, grade: "3", level: "Low" },
+      { minMark: 19, maxMark: 20, grade: "3", level: "Medium" },
+      { minMark: 21, maxMark: 22, grade: "3", level: "High" },
+      { minMark: 23, maxMark: 25, grade: "4", level: "Low" },
+      { minMark: 26, maxMark: 29, grade: "4", level: "Medium" },
+      { minMark: 30, maxMark: 32, grade: "4", level: "High" },
+      { minMark: 33, maxMark: 38, grade: "5", level: "Low" },
+      { minMark: 39, maxMark: 44, grade: "5", level: "Medium" },
+      { minMark: 45, maxMark: 50, grade: "5", level: "High" }
+    ].map(band => Object.freeze(band)));
+    const FUNCTIONAL_MAX_MARKS = 56;
+    const FUNCTIONAL_PASS_MARK = 34;
+
+    function determineOctoberGrade(total) {
+      if (!Number.isInteger(total) || total < 0 || total > OCTOBER_MAX_MARKS) {
+        throw new RangeError("October marks must be a whole number from 0 to 50.");
+      }
+      const band = OCTOBER_BANDS.find(item => total >= item.minMark && total <= item.maxMark);
+      if (!band) throw new Error("The October mark ranges do not cover this total.");
+      return {
+        ...band,
+        label: band.level ? `${band.grade} ${band.level}` : band.grade,
+        pct: total * 100 / OCTOBER_MAX_MARKS
+      };
+    }
+
+    function determineFunctionalResult(total) {
+      if (!Number.isInteger(total) || total < 0 || total > FUNCTIONAL_MAX_MARKS) {
+        throw new RangeError("Functional Skills marks must be a whole number from 0 to 56.");
+      }
+      return total >= FUNCTIONAL_PASS_MARK ? "Pass" : "Not pass";
+    }
+
+    const octoberInput = document.getElementById("octoberMarks");
+    const octoberValidation = document.getElementById("octoberValidation");
+    const octoberSummary = document.getElementById("octoberSummary");
+    const octoberBreakdown = document.getElementById("octoberBreakdown");
+    const octoberCopySummary = document.getElementById("octoberCopySummary");
+    const octoberCopyBreakdown = document.getElementById("octoberCopyBreakdown");
+    const octoberCopiedSummary = document.getElementById("octoberCopiedSummary");
+    const octoberCopiedBreakdown = document.getElementById("octoberCopiedBreakdown");
+    const octoberToggle = document.getElementById("octoberToggle");
+    const octoberBreakdownSection = document.getElementById("octoberBreakdownSection");
+    const octoberBoundaryRows = document.getElementById("octoberBoundaryRows");
+    const functionalInput = document.getElementById("functionalMarks");
+    const functionalValidation = document.getElementById("functionalValidation");
+    const functionalSummary = document.getElementById("functionalSummary");
+    const functionalCopySummary = document.getElementById("functionalCopySummary");
+    const functionalCopiedSummary = document.getElementById("functionalCopiedSummary");
+
+    // Build the reference table from the same source of truth as the calculation.
+    [...OCTOBER_BANDS].reverse().forEach(band => {
+      const row = document.createElement("tr");
+      row.dataset.minMark = String(band.minMark);
+      const markCell = document.createElement("td");
+      const gradeCell = document.createElement("td");
+      markCell.textContent = `${band.minMark} – ${band.maxMark}`;
+      gradeCell.textContent = band.level ? `${band.grade} ${band.level}` : band.grade;
+      row.append(markCell, gradeCell);
+      octoberBoundaryRows.append(row);
+    });
+
+    function highlightOctoberBand(minMark = null) {
+      [...octoberBoundaryRows.rows].forEach(row => {
+        const current = minMark !== null && Number(row.dataset.minMark) === minMark;
+        row.classList.toggle("is-current", current);
+        if (current) row.setAttribute("aria-current", "true");
+        else row.removeAttribute("aria-current");
+      });
+    }
+
+    function updateOctober() {
+      calculationVersion += 1;
+      octoberSummary.textContent = "";
+      octoberBreakdown.value = "";
+      octoberCopySummary.disabled = true;
+      octoberCopyBreakdown.disabled = true;
+      octoberCopiedSummary.textContent = "";
+      octoberCopiedBreakdown.textContent = "";
+      octoberValidation.textContent = "";
+      octoberValidation.hidden = true;
+      octoberInput.setAttribute("aria-invalid", "false");
+      highlightOctoberBand();
+
+      const marks = readMarks(octoberInput, OCTOBER_MAX_MARKS, "October assessment marks");
+      if (marks.error) {
+        octoberValidation.textContent = marks.error;
+        octoberValidation.hidden = false;
+        octoberInput.setAttribute("aria-invalid", "true");
+        return;
+      }
+      if (marks.empty) return;
+
+      const result = determineOctoberGrade(marks.value);
+      const percentage = result.pct.toFixed(2);
+      const gradeBands = OCTOBER_BANDS.filter(band => band.grade === result.grade);
+      const gradeMinimum = gradeBands[0].minMark;
+      const gradeMaximum = gradeBands[gradeBands.length - 1].maxMark;
+      const levelBreakdown = result.level
+        ? `High / Medium / Low ranges (out of ${OCTOBER_MAX_MARKS}):\n` +
+          gradeBands.map(band => `${band.level}: ${band.minMark} – ${band.maxMark}`).join("\n")
+        : "U: 0 – 4 marks. No High / Medium / Low subdivision applies.";
+
+      octoberSummary.textContent =
+`Assessment: End-of-October half-term
+Assigned Grade: ${result.label}
+Total Marks: ${marks.value} / ${OCTOBER_MAX_MARKS}
+Percentage: ${percentage}%`;
+      octoberBreakdown.value =
+`GCSE MATHS GRADE CALCULATION
+Assessment: End-of-October half-term
+
+Total: ${marks.value} / ${OCTOBER_MAX_MARKS}
+Percentage: ${percentage}%
+Assigned Grade: ${result.label}
+
+Grade ${result.grade} range: ${gradeMinimum} – ${gradeMaximum}
+Assigned band (${result.label}): ${result.minMark} – ${result.maxMark}
+
+${levelBreakdown}
+
+Notes:
+- Maximum total: ${OCTOBER_MAX_MARKS} marks.
+- Uses the exact supplied October whole-mark boundaries, including High, Medium and Low.
+- Both ends of every mark range are included.
+- The displayed percentage does not determine the grade.
+- September diagnostic boundaries are not used for this assessment.`;
+      highlightOctoberBand(result.minMark);
+      octoberCopySummary.disabled = false;
+      octoberCopyBreakdown.disabled = false;
+    }
+
+    function updateFunctional() {
+      calculationVersion += 1;
+      functionalSummary.textContent = "";
+      functionalCopySummary.disabled = true;
+      functionalCopiedSummary.textContent = "";
+      functionalValidation.textContent = "";
+      functionalValidation.hidden = true;
+      functionalInput.setAttribute("aria-invalid", "false");
+
+      const marks = readMarks(functionalInput, FUNCTIONAL_MAX_MARKS, "Functional Skills marks");
+      if (marks.error) {
+        functionalValidation.textContent = marks.error;
+        functionalValidation.hidden = false;
+        functionalInput.setAttribute("aria-invalid", "true");
+        return;
+      }
+      if (marks.empty) return;
+
+      functionalSummary.textContent =
+`Assessment: Functional Skills
+Result: ${determineFunctionalResult(marks.value)}
+Total Marks: ${marks.value} / ${FUNCTIONAL_MAX_MARKS}
+Pass mark: ${FUNCTIONAL_PASS_MARK} / ${FUNCTIONAL_MAX_MARKS}`;
+      functionalCopySummary.disabled = false;
+    }
+
+    octoberInput.addEventListener("input", updateOctober);
+    functionalInput.addEventListener("input", updateFunctional);
+    octoberToggle.addEventListener("change", () => {
+      octoberBreakdownSection.hidden = octoberToggle.value !== "show";
+    });
+    octoberCopySummary.addEventListener("click", () => copyOutput(octoberSummary.textContent, octoberCopiedSummary));
+    octoberCopyBreakdown.addEventListener("click", () => copyOutput(octoberBreakdown.value, octoberCopiedBreakdown));
+    functionalCopySummary.addEventListener("click", () => copyOutput(functionalSummary.textContent, functionalCopiedSummary));
+
+    // Clearing one assessment must not erase another tab's marks.
+    document.getElementById("clearSeptember").addEventListener("click", () => {
+      papers.forEach(paper => { paper.input.value = ""; });
+      updateGrade();
+      getSelectedPapers()[0].input.focus();
+    });
+    document.getElementById("clearOctober").addEventListener("click", () => {
+      octoberInput.value = "";
+      updateOctober();
+      octoberInput.focus();
+    });
+    document.getElementById("clearFunctional").addEventListener("click", () => {
+      functionalInput.value = "";
+      updateFunctional();
+      functionalInput.focus();
+    });
+
+    const assessmentTabs = [...document.querySelectorAll('[role="tab"][data-assessment]')];
+    let activeAssessment = "september";
+    const refreshAssessment = {
+      september: syncPaperSelection,
+      october: updateOctober,
+      functional: updateFunctional
+    };
+
+    function activateAssessment(assessment, moveFocus = false) {
+      if (!Object.prototype.hasOwnProperty.call(refreshAssessment, assessment)) return;
+      activeAssessment = assessment;
+      calculationVersion += 1; // Cancel any pending confirmation from a different tab.
+      document.querySelectorAll(".copied-message").forEach(message => { message.textContent = ""; });
+      assessmentTabs.forEach(tab => {
+        const selected = tab.dataset.assessment === assessment;
+        tab.setAttribute("aria-selected", String(selected));
+        tab.tabIndex = selected ? 0 : -1;
+        document.getElementById(tab.getAttribute("aria-controls")).hidden = !selected;
+        if (selected && moveFocus) tab.focus();
+      });
+      // Keep tab values independent, and revalidate the active tab on return.
+      refreshAssessment[assessment]();
+    }
+
+    assessmentTabs.forEach((tab, index) => {
+      tab.addEventListener("click", () => activateAssessment(tab.dataset.assessment));
+      tab.addEventListener("keydown", event => {
+        if (event.ctrlKey || event.metaKey || event.altKey) return;
+        let nextIndex;
+        if (event.key === "ArrowRight") nextIndex = (index + 1) % assessmentTabs.length;
+        else if (event.key === "ArrowLeft") nextIndex = (index - 1 + assessmentTabs.length) % assessmentTabs.length;
+        else if (event.key === "Home") nextIndex = 0;
+        else if (event.key === "End") nextIndex = assessmentTabs.length - 1;
+        else return;
+        event.preventDefault();
+        activateAssessment(assessmentTabs[nextIndex].dataset.assessment, true);
+      });
+    });
+
+    window.addEventListener("pageshow", () => {
+      updateOctober();
+      updateFunctional();
+      breakdownSection.style.display = toggle.value === "show" ? "block" : "none";
+      octoberBreakdownSection.hidden = octoberToggle.value !== "show";
+      activateAssessment(activeAssessment);
+    });
+
+    updateOctober();
+    updateFunctional();
+    activateAssessment("september");
+  </script>
+</body>
+</html>
